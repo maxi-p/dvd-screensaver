@@ -1,0 +1,7 @@
+.DS_Store
+.vscode/
+imgui-sfml/
+imgui/
+*.ini
+*.dSYM
+out
