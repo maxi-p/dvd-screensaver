@@ -5,3 +5,7 @@ imgui/
 *.ini
 *.dSYM
 out
+main.o
+scratch-commands.txt
+build.sh
+imgui-build/

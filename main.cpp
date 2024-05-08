@@ -31,10 +31,11 @@ int main(int argc, char* argv[]){
     float c[3] = { 0.0f, 1.0f, 1.0f };
 
     // let's make a shape that we will draw to the screen
+    float speed = 7.0f;
     float circleRadius = 50;
     int circleSegments = 32;
-    float circleSpeedX = 1.0f;
-    float circleSpeedY = 0.5f;
+    float circleSpeedX = speed;
+    float circleSpeedY = speed;
     bool drawCircle = true;
     bool drawText = true;
 
@@ -121,6 +122,16 @@ int main(int argc, char* argv[]){
         circle.setFillColor(sf::Color(c[0]*255, c[1]*255, c[2]*255));
         circle.setPointCount(circleSegments);
         circle.setRadius(circleRadius);
+
+        // basic bouncing from walls logic
+        if( circle.getPosition().x + circleRadius*2 >= wWidth || circle.getPosition().x < 0 )
+        {
+            circleSpeedX *= -1.0f;
+        }
+        if( circle.getPosition().y + circleRadius*2 >= wHeight || circle.getPosition().y < 0 )
+        {
+            circleSpeedY *= -1.0f;
+        }
 
         // basic animation - move each frame if it's still in frame
         circle.setPosition(circle.getPosition().x + circleSpeedX, circle.getPosition().y + circleSpeedY);
