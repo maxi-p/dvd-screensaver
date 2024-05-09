@@ -1,154 +1,287 @@
 #include <iostream>
 #include <memory>
 #include <fstream>
-
+#include <string.h>
+#include <stdlib.h>
 #include <SFML/Graphics.hpp>
 
 #include "imgui.h"
-
 #include "imgui-SFML.h"
-// int main (){
-//     return 0;
-// }
+#include "Circle.hpp"
+#include "Rectangle.hpp"
+
 int main(int argc, char* argv[]){
     // create a new window of size w*h pixels
     // topleft of the window is (0,0) and bottom-right is (w,h)
     // you will have toread these from the config file
+    std::vector<std::shared_ptr<Circle>> circles;
+    std::vector<std::shared_ptr<Rectangle>> rectangles;
 
-    const int wWidth = 1280;
-    const int wHeight = 720;
-    sf::RenderWindow window(sf::VideoMode(wWidth, wHeight),"SFML works!");
+    std::string typeText;
+    std::string name;
+    int         numCirc      {0};
+    int         numRect      {0};
+    float       radius;
+    float       width;
+    float       height;
+    int         segments    = 32;
+    float       positionX;
+    float       positionY;
+    float       speedX;
+    float       speedY;
+    int         red;
+    int         green;
+    int         blue;
+    int         wWidth      = 1280;
+    int         wHeight     = 720;
+
+    // Extracting configs
+    std::ifstream file("ez-config.txt");
+    while(file >> typeText){
+        if(strcmp(typeText.c_str(), "Window") == 0)
+        {
+            file >> wWidth >> wHeight;
+        }
+        if(strcmp(typeText.c_str(), "Circle") == 0)
+        {
+            file >> name >> positionX >> positionY >> speedX >> speedY >> red >> green >> blue >> radius;
+            std::shared_ptr<Circle> p (new Circle(name, positionX, positionY, speedX, speedY, red, green, blue, radius));
+            circles.push_back(p);
+            numCirc++;
+        }
+        if(strcmp(typeText.c_str(), "Rectangle") == 0)
+        {
+            file >> name >> positionX >> positionY >> speedX >> speedY >> red >> green >> blue >> width >> height;
+            std::shared_ptr<Rectangle> r (new Rectangle(name, positionX, positionY, speedX, speedY, red, green, blue, width, height));
+            rectangles.push_back(r);
+            numRect++;
+        }
+    }
+
+    static int item_current = 0;
+    static int item_prev = 0;
+    char** items = new char*[numCirc+numRect];
+    for(int i=0; i<numCirc; i++)
+    {
+        items[i] = new char[50];
+        // std::cout << circles[i]->name << '\n';
+        strcpy(items[i], circles[i]->name.c_str());
+        std::cout << items[i] << '\n';
+    }
+    for(int i=0; i<numRect; i++){
+        items[i+numCirc] = new char[50];
+        strcpy(items[i+numCirc], rectangles[i]->name.c_str());
+        std::cout << items[i+numCirc] << '\n';
+    }
+
+    sf::RenderWindow window(sf::VideoMode(wWidth, wHeight),"DVD screensaver!");
     window.setFramerateLimit(60);
 
     // initialize IMGUI and create a clock used for its internal timing
     ImGui::SFML::Init(window);
     sf::Clock deltaClock;
-
-    // scale the imgui ui by a given factor, does not affect text size
     ImGui::GetStyle().ScaleAllSizes(1.0f);
 
-    // the imgui color {r,g,b} wheel requires floats from 0-1 instead of ints from 0-255
-    float c[3] = { 0.0f, 1.0f, 1.0f };
+    std::vector<sf::CircleShape> sfCircles;
+    std::vector<sf::RectangleShape> sfRectangles;
+    for(int i = 0; i < circles.size(); i++)
+    {
+        sf::CircleShape circle(circles[i]->radius, circles[i]->segments);
+        circle.setPosition(circles[i]->positionX, circles[i]->positionY);
+        circle.setFillColor(sf::Color(circles[i]->red, circles[i]->green, circles[i]->blue));
+        sfCircles.push_back(circle);
+    }
 
-    // let's make a shape that we will draw to the screen
-    float speed = 7.0f;
-    float circleRadius = 50;
-    int circleSegments = 32;
-    float circleSpeedX = speed;
-    float circleSpeedY = speed;
-    bool drawCircle = true;
-    bool drawText = true;
-
-    // create the sfml circle shape based on our parameters
-    sf::CircleShape circle(circleRadius, circleSegments);
-    circle.setPosition(10.0f, 10.0f);
+    for(int i = 0; i < rectangles.size(); i++)
+    {
+        sf::RectangleShape rectangle(sf::Vector2f(rectangles[i]->width, rectangles[i]->height));
+        rectangle.setPosition(rectangles[i]->positionX, rectangles[i]->positionY);
+        rectangle.setFillColor(sf::Color(rectangles[i]->red, rectangles[i]->green, rectangles[i]->blue));
+        sfRectangles.push_back(rectangle);
+    }
 
     sf::Font myFont;
-
     if(!myFont.loadFromFile("fonts/enchrome-ascii.ttf")) 
     {
         std::cerr << "could not load font!\n";
         exit(-1);
     }
 
-    // set up the text object that will be drawn to the screen
-    sf::Text text("Sample text", myFont, 24);
-
-    // position the top left corner of the text so that the text aligns on the bottom
-    // text character size is in pixels, so move the text up from the bottom by its height
-
-    text.setPosition(0, wHeight - (float)text.getCharacterSize());
-
     // set up a character array to set the text
-    char displayString[255] = "Sample Text";
+    char displayString[255];
+    strcpy(displayString, circles[item_current]->name.c_str());
+    float c[3]              = { (float)circles[item_current]->red/255, (float)circles[item_current]->green/255, (float)circles[item_current]->blue/255 };
+    float scale             = 1.0f;
+    bool draw               = true;
+    static float vec4f[2]   = { abs(circles[item_current]->speedX), abs(circles[item_current]->speedY) };
 
     // main loop - continues for each frame while window is open
     while(window.isOpen())
     {
-        // event handling
         sf::Event event;
         while(window.pollEvent(event))
         {
             // pass the event to imgui to be parsed
             ImGui::SFML::ProcessEvent(window, event);
-
-            // this event triggers when the window is closed 
             if (event.type == sf::Event::Closed )
             {
                 window.close();
             }
-
-            // this event is triggered when a key is pressed
             if (event.type == sf::Event::KeyPressed)
             {
-                // print the key that was pressed to the console
-                std::cout << "Key pressed with code = " << event.key.code << "\n";
-
-                // example, what happens when x is pressed
-                if( event.key.code == sf::Keyboard::X)
+                if( event.key.code == sf::Keyboard::Q)
                 {
-                    // reverse the x direction of the circle on the screen
-                    circleSpeedX *= -1.0f;
+                    window.close();
                 }
-
             }
-        }
+        } 
 
         // update imgui for this frame with the time that the last frame took
         ImGui::SFML::Update(window, deltaClock.restart());
-
-        // draw the UI
-        ImGui::Begin("Window title");
-        ImGui::Text("Window text!");
-        ImGui::Checkbox("Draw Circle", &drawCircle);
-        ImGui::SameLine();
-        ImGui::Checkbox("Draw Text", &drawText);
-        ImGui::SliderFloat("Radius", &circleRadius, 0.0f, 300.0f);
-        ImGui::SliderInt("Sides", &circleSegments, 3, 64);
-        ImGui::ColorEdit3("Color Circle", c);
-        ImGui::InputText("Text", displayString, 255);
-        if(ImGui::Button("Set Text"))
-        {
-            text.setString(displayString);
-        }
-        ImGui::SameLine();
-        if( ImGui::Button("Reset Circle"))
-        {
-            circle.setPosition(0, 0);
-        }
+        ImGui::Begin("Shape Properties");
+        ImGui::Combo("Shape", &item_current, items, numCirc+numRect);
+        ImGui::Checkbox("Draw Shape", &draw);
+        ImGui::SliderFloat("Scale", &scale, 1.0f, 10.0f);
+        ImGui::SliderFloat2("Velociry", vec4f, 0.001f, 10.0f);
+        ImGui::ColorEdit3("Color", c);
+        ImGui::InputText("Name", displayString, 255);
         ImGui::End();
 
-        // set the circle properties, because they may have been updated with the ui
-        circle.setFillColor(sf::Color(c[0]*255, c[1]*255, c[2]*255));
-        circle.setPointCount(circleSegments);
-        circle.setRadius(circleRadius);
-
-        // basic bouncing from walls logic
-        if( circle.getPosition().x + circleRadius*2 >= wWidth || circle.getPosition().x < 0 )
+        if(item_current < numCirc)
         {
-            circleSpeedX *= -1.0f;
+            if(item_current != item_prev)
+            {
+                draw        = circles[item_current]->draw;
+                vec4f[0]    = abs(circles[item_current]->speedX);
+                vec4f[1]    = abs(circles[item_current]->speedY);
+                c[0]        = (float)circles[item_current]->red/255;
+                c[1]        = (float)circles[item_current]->green/255; 
+                c[2]        = (float)circles[item_current]->blue/255;
+                scale       = circles[item_current]->scale;
+                item_prev   = item_current;
+            }
+            else
+            {
+                circles[item_current]->draw      = draw;
+                circles[item_current]->speedX   /= (abs(circles[item_current]->speedX)/vec4f[0]);
+                circles[item_current]->speedY   /= (abs(circles[item_current]->speedY)/vec4f[1]);
+                circles[item_current]->radius    = scale*circles[item_current]->baseRadius;
+                circles[item_current]->red       = (int)(c[0]*255);
+                circles[item_current]->green     = (int)(c[1]*255);
+                circles[item_current]->blue      = (int)(c[2]*255);
+                circles[item_current]->scale     = scale;
+            }
         }
-        if( circle.getPosition().y + circleRadius*2 >= wHeight || circle.getPosition().y < 0 )
+        else
         {
-            circleSpeedY *= -1.0f;
+            if(item_current != item_prev)
+            {
+                draw        = rectangles[item_current-numCirc]->draw;
+                vec4f[0]    = abs(rectangles[item_current-numCirc]->speedX);
+                vec4f[1]    = abs(rectangles[item_current-numCirc]->speedY);
+                c[0]        = (float)rectangles[item_current-numCirc]->red/255;
+                c[1]        = (float)rectangles[item_current-numCirc]->green/255; 
+                c[2]        = (float)rectangles[item_current-numCirc]->blue/255;
+                scale       = rectangles[item_current-numCirc]->scale;
+                item_prev   = item_current;
+            }
+            else
+            {
+                rectangles[item_current-numCirc]->draw       = draw;
+                rectangles[item_current-numCirc]->speedX    /= (abs(rectangles[item_current-numCirc]->speedX)/vec4f[0]);
+                rectangles[item_current-numCirc]->speedY    /= (abs(rectangles[item_current-numCirc]->speedY)/vec4f[1]);
+                rectangles[item_current-numCirc]->width      = scale*rectangles[item_current-numCirc]->baseWidth;
+                rectangles[item_current-numCirc]->height     = scale*rectangles[item_current-numCirc]->baseHeight;
+                rectangles[item_current-numCirc]->red        = (int)(c[0]*255);
+                rectangles[item_current-numCirc]->green      = (int)(c[1]*255);
+                rectangles[item_current-numCirc]->blue       = (int)(c[2]*255);
+                rectangles[item_current-numCirc]->scale      = scale;
+            }
         }
 
-        // basic animation - move each frame if it's still in frame
-        circle.setPosition(circle.getPosition().x + circleSpeedX, circle.getPosition().y + circleSpeedY);
+        // Bouncing from walls logic: circles
+        for(int i = 0; i < circles.size(); i++)
+        {
+            auto cur = sfCircles[i].getPosition();
+            if(cur.x + circles[i]->radius*2 >= wWidth || cur.x < 0)
+            {
+                circles[i]->speedX *= -1.0f;
+            }
+            if(cur.y + circles[i]->radius*2 >= wHeight || cur.y < 0)
+            {
+                circles[i]->speedY *= -1.0f;
+            }
+        }
 
-        // basic rendering function calls 
+        // Bouncing from walls logic: rectangles
+        for(int i = 0; i < rectangles.size(); i++)
+        {
+            auto cur = sfRectangles[i].getPosition();
+            if(cur.x + rectangles[i]->width >= wWidth || cur.x < 0)
+            {
+                rectangles[i]->speedX *= -1.0f;
+            }
+            if(cur.y + rectangles[i]->height >= wHeight || cur.y < 0)
+            {
+                rectangles[i]->speedY *= -1.0f;
+            }
+        }
+
+        // Movement
+        for(int i = 0; i < sfCircles.size(); i++)
+        {
+            auto cur = sfCircles[i].getPosition();
+            circles[i]->positionX = cur.x + circles[i]->speedX;
+            circles[i]->positionY = cur.y + circles[i]->speedY;
+        }
+        for(int i = 0; i < sfRectangles.size(); i++)
+        {
+            auto cur = sfRectangles[i].getPosition();
+            rectangles[i]->positionX = cur.x + rectangles[i]->speedX;
+            rectangles[i]->positionY = cur.y + rectangles[i]->speedY;
+        }
+
+        // SFML
+        for(int i = 0; i < sfCircles.size(); i++)
+        {
+            sfCircles[i].setPosition(circles[i]->positionX, circles[i]->positionY);
+            sfCircles[i].setFillColor(sf::Color(circles[i]->red, circles[i]->green, circles[i]->blue));
+            sfCircles[i].setScale(circles[i]->scale, circles[i]->scale);
+        }
+        for(int i = 0; i < sfRectangles.size(); i++)
+        {
+            sfRectangles[i].setPosition(rectangles[i]->positionX, rectangles[i]->positionY);
+            sfRectangles[i].setFillColor(sf::Color(rectangles[i]->red, rectangles[i]->green, rectangles[i]->blue));
+            sfRectangles[i].setScale(rectangles[i]->scale, rectangles[i]->scale);
+        }
+
+        // Rendering
         window.clear();
-        if( drawCircle )
+        for(int i = 0; i < sfCircles.size(); i++)
         {
-            window.draw(circle);
+            if(circles[i]->draw)
+            {
+                window.draw(sfCircles[i]);
+            }
         }
-        if( drawText )
+        for(int i = 0; i < sfRectangles.size(); i++)
         {
-            window.draw(text);
+            if(rectangles[i]->draw)
+            {
+                window.draw(sfRectangles[i]);
+            }
         }
         ImGui::SFML::Render(window);
         window.display();
     }
 
+    // Deallocating
+    for(int i=0; i<numCirc+numRect; i++)
+    {
+        delete[] items[i];
+    }
+    delete[] items;
+
+    ImGui::SFML::Shutdown();
     return 0;
 }

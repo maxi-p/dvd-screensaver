@@ -5,7 +5,9 @@ imgui/
 *.ini
 *.dSYM
 out
-main.o
+*.o
 scratch-commands.txt
 build.sh
 imgui-build/
+check
+
