@@ -58,6 +58,13 @@ int main(int argc, char* argv[]){
         }
     }
 
+    sf::Font myFont;
+    if(!myFont.loadFromFile("fonts/enchrome-ascii.ttf")) 
+    {
+        std::cerr << "could not load font!\n";
+        exit(-1);
+    }
+
     static int item_current = 0;
     static int item_prev = 0;
     char** items = new char*[numCirc+numRect];
@@ -83,12 +90,16 @@ int main(int argc, char* argv[]){
     ImGui::GetStyle().ScaleAllSizes(1.0f);
 
     std::vector<sf::CircleShape> sfCircles;
+    std::vector<sf::Text> sfTexts;
     std::vector<sf::RectangleShape> sfRectangles;
     for(int i = 0; i < circles.size(); i++)
     {
         sf::CircleShape circle(circles[i]->radius, circles[i]->segments);
         circle.setPosition(circles[i]->positionX, circles[i]->positionY);
         circle.setFillColor(sf::Color(circles[i]->red, circles[i]->green, circles[i]->blue));
+        sf::Text text(circles[i]->name.c_str(), myFont, 12);
+        text.setPosition(0, wHeight - (float)text.getCharacterSize());
+        sfTexts.push_back(text);
         sfCircles.push_back(circle);
     }
 
@@ -97,14 +108,10 @@ int main(int argc, char* argv[]){
         sf::RectangleShape rectangle(sf::Vector2f(rectangles[i]->width, rectangles[i]->height));
         rectangle.setPosition(rectangles[i]->positionX, rectangles[i]->positionY);
         rectangle.setFillColor(sf::Color(rectangles[i]->red, rectangles[i]->green, rectangles[i]->blue));
+        sf::Text text(rectangles[i]->name.c_str(), myFont, 12);
+        text.setPosition(0, wHeight - (float)text.getCharacterSize());
+        sfTexts.push_back(text);
         sfRectangles.push_back(rectangle);
-    }
-
-    sf::Font myFont;
-    if(!myFont.loadFromFile("fonts/enchrome-ascii.ttf")) 
-    {
-        std::cerr << "could not load font!\n";
-        exit(-1);
     }
 
     // set up a character array to set the text
@@ -151,18 +158,19 @@ int main(int argc, char* argv[]){
         {
             if(item_current != item_prev)
             {
-                draw        = circles[item_current]->draw;
+                strcpy(displayString,circles[item_current]->name.c_str());
                 vec4f[0]    = abs(circles[item_current]->speedX);
                 vec4f[1]    = abs(circles[item_current]->speedY);
                 c[0]        = (float)circles[item_current]->red/255;
                 c[1]        = (float)circles[item_current]->green/255; 
                 c[2]        = (float)circles[item_current]->blue/255;
                 scale       = circles[item_current]->scale;
+                draw        = circles[item_current]->draw;
                 item_prev   = item_current;
             }
             else
             {
-                circles[item_current]->draw      = draw;
+                circles[item_current]->name      = displayString;
                 circles[item_current]->speedX   /= (abs(circles[item_current]->speedX)/vec4f[0]);
                 circles[item_current]->speedY   /= (abs(circles[item_current]->speedY)/vec4f[1]);
                 circles[item_current]->radius    = scale*circles[item_current]->baseRadius;
@@ -170,23 +178,26 @@ int main(int argc, char* argv[]){
                 circles[item_current]->green     = (int)(c[1]*255);
                 circles[item_current]->blue      = (int)(c[2]*255);
                 circles[item_current]->scale     = scale;
+                circles[item_current]->draw      = draw;
             }
         }
         else
         {
             if(item_current != item_prev)
             {
-                draw        = rectangles[item_current-numCirc]->draw;
+                strcpy(displayString,rectangles[item_current-numCirc]->name.c_str());
                 vec4f[0]    = abs(rectangles[item_current-numCirc]->speedX);
                 vec4f[1]    = abs(rectangles[item_current-numCirc]->speedY);
                 c[0]        = (float)rectangles[item_current-numCirc]->red/255;
                 c[1]        = (float)rectangles[item_current-numCirc]->green/255; 
                 c[2]        = (float)rectangles[item_current-numCirc]->blue/255;
                 scale       = rectangles[item_current-numCirc]->scale;
+                draw        = rectangles[item_current-numCirc]->draw;
                 item_prev   = item_current;
             }
             else
             {
+                rectangles[item_current-numCirc]->name       = displayString;
                 rectangles[item_current-numCirc]->draw       = draw;
                 rectangles[item_current-numCirc]->speedX    /= (abs(rectangles[item_current-numCirc]->speedX)/vec4f[0]);
                 rectangles[item_current-numCirc]->speedY    /= (abs(rectangles[item_current-numCirc]->speedY)/vec4f[1]);
@@ -247,12 +258,16 @@ int main(int argc, char* argv[]){
             sfCircles[i].setPosition(circles[i]->positionX, circles[i]->positionY);
             sfCircles[i].setFillColor(sf::Color(circles[i]->red, circles[i]->green, circles[i]->blue));
             sfCircles[i].setScale(circles[i]->scale, circles[i]->scale);
+            sfTexts[i].setString(circles[i]->name);
+            sfTexts[i].setPosition(circles[i]->positionX+circles[i]->radius-((float)sfTexts[i].getGlobalBounds().width/2), circles[i]->positionY+circles[i]->radius-((float)sfTexts[i].getGlobalBounds().width/sfTexts[i].getString().getSize()));
         }
         for(int i = 0; i < sfRectangles.size(); i++)
         {
             sfRectangles[i].setPosition(rectangles[i]->positionX, rectangles[i]->positionY);
             sfRectangles[i].setFillColor(sf::Color(rectangles[i]->red, rectangles[i]->green, rectangles[i]->blue));
             sfRectangles[i].setScale(rectangles[i]->scale, rectangles[i]->scale);
+            sfTexts[i+numCirc].setString(rectangles[i]->name);
+            sfTexts[i+numCirc].setPosition(rectangles[i]->positionX+rectangles[i]->width/2-((float)sfTexts[i+numCirc].getGlobalBounds().width/2), rectangles[i]->positionY+rectangles[i]->height/2-((float)sfTexts[i+numCirc].getGlobalBounds().width/sfTexts[i+numCirc].getString().getSize()));
         }
 
         // Rendering
@@ -262,6 +277,7 @@ int main(int argc, char* argv[]){
             if(circles[i]->draw)
             {
                 window.draw(sfCircles[i]);
+                window.draw(sfTexts[i]);
             }
         }
         for(int i = 0; i < sfRectangles.size(); i++)
@@ -269,6 +285,7 @@ int main(int argc, char* argv[]){
             if(rectangles[i]->draw)
             {
                 window.draw(sfRectangles[i]);
+                window.draw(sfTexts[i+numCirc]);
             }
         }
         ImGui::SFML::Render(window);
